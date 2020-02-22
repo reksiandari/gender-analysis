@@ -1,0 +1,112 @@
+---
+title: "Jobs by Gender"
+author: "Reksi"
+date: "`r format(Sys.Date(), '%B %e, %Y')`"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: scroll
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+```
+
+```{r}
+library(tidyverse)
+library(glue)
+library(plotly)
+```
+
+Import Data
+```{r}
+jobs_gender <- read_csv("/Users/mac/Documents/ALGORITMA/IP/jobs_gender.csv")
+```
+
+```{r}
+jg <- jobs_gender %>% 
+  select(-wage_percent_of_male) %>% 
+  drop_na(total_earnings_male, total_earnings_female) %>% 
+  mutate(major_category = as.factor(major_category),
+         minor_category = as.factor(minor_category))
+```
+
+Page 1
+===================================== 
+
+Column {.tabset}
+-----------------------------------------------------------------------
+
+### Line Plot
+
+```{r}
+jg1 <- jg %>% 
+  group_by(year) %>% 
+  summarise(median.total.earnings = median(total_earnings), 
+            median.earnings.male = median(total_earnings_male), 
+            median.earnings.female = median(total_earnings_female)) %>% 
+  ungroup() %>%
+  pivot_longer(cols = -year, names_to = "median.earnings", values_to = "earnings") %>% 
+  mutate(text=glue(
+    "Total Earnings:{earnings}"
+  ))
+```
+
+```{r}
+jg.plot <- ggplot(jg1, aes(x = year, y = earnings))+
+  geom_line(aes(color=median.earnings))+
+  geom_point(aes(color=median.earnings, text = text))+
+  labs(title = "Median Earnings Across Gender")+
+  scale_y_continuous(labels = scales::comma)
+
+ggplotly(jg.plot, tooltip = "text")
+```
+
+
+### Scatter Plot
+```{r}
+jg2 <- jg %>% 
+  group_by(major_category) %>% 
+  mutate(labeltext = glue(
+    "Total Earnings: {total_earnings}"
+  ))
+```
+
+```{r}
+jg.plot2 <- ggplot(jg2, aes(x=total_workers, y=total_earnings))+
+  geom_jitter(aes(color=major_category))+
+  geom_smooth(method="lm")+
+  scale_y_continuous(labels = scales::dollar_format(scale=1e-3, prefix="$",suffix="K"))
+  
+ggplotly(jg.plot2, text = "labeltext")
+```
+
+
+Page 2
+===================================== 
+Column
+-----------------------------------------------------------------------
+
+### Barplot
+
+```{r}
+jg3 <- jg %>% 
+  group_by(major_category) %>% 
+  summarise(male.mp = sum(workers_male), 
+            female.mp=sum(workers_female)) %>% 
+  ungroup() %>% 
+  pivot_longer(col = -major_category,names_to = "gender.mp", values_to = "mp.amount") %>% 
+  mutate(gender.mp = as_factor(gender.mp),
+         labelteks = glue(
+           "Jumlah Manpower: {mp.amount}"
+         ))
+
+jg.plot3 <- ggplot(jg3, aes(x=major_category, y=mp.amount))+
+  geom_col(aes(fill=gender.mp, text = labelteks))+
+  coord_flip()+
+  labs(title="Gender Manpower/Kategori Kerja")
+
+ggplotly(jg.plot3, text = "labelteks") %>% 
+  config(displaylogo = F)
+```
+
